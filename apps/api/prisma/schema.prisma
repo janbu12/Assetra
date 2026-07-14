@@ -311,3 +311,12 @@ model SystemAuditLog {
   createdAt  DateTime @default(now())
   @@index([entityType, entityId, createdAt])
 }
+
+model SystemSetting {
+  id                    String   @id @default("organization")
+  organizationName      String   @default("Perusahaan Demo Assetra")
+  timezone              String   @default("Asia/Jakarta")
+  currency              String   @default("IDR")
+  warrantyNotifications Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+}
