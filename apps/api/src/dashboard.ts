@@ -10,15 +10,19 @@ import { Permissions, Public } from './auth';
 export class DashboardService {
   constructor(private db: PrismaService) {}
   async summary() {
-    const [total, grouped, value, maintenanceCost, byCategory, byLocation] = await Promise.all([
+    const [total, grouped, value, maintenanceCost, byCategory, byLocation, departmentCount, activeMaintenance, attention, recentMovements] = await Promise.all([
       this.db.asset.count({ where: { deletedAt: null } }),
       this.db.asset.groupBy({ by: ['status'], where: { deletedAt: null }, _count: true }),
       this.db.asset.aggregate({ where: { deletedAt: null }, _sum: { purchasePrice: true } }),
       this.db.maintenanceLog.aggregate({ _sum: { cost: true } }),
       this.db.category.findMany({ where: { deletedAt: null }, select: { name: true, _count: { select: { assets: true } } } }),
       this.db.location.findMany({ where: { deletedAt: null }, select: { name: true, _count: { select: { assets: true } } } }),
+      this.db.department.count({ where: { deletedAt: null } }),
+      this.db.maintenanceLog.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+      this.db.asset.findMany({ where: { deletedAt: null, OR: [{ status: 'MAINTENANCE' }, { condition: { in: ['DAMAGED', 'NEEDS_REPAIR'] } }, { warrantyUntil: { lte: new Date(Date.now() + 30 * 86_400_000), gte: new Date() } }] }, include: { location: true }, take: 8, orderBy: { updatedAt: 'desc' } }),
+      this.db.assetMovement.findMany({ include: { asset: { select: { id: true, code: true, name: true } } }, take: 6, orderBy: { createdAt: 'desc' } }),
     ]);
-    return { total, byStatus: grouped.map((x) => ({ status: x.status, count: x._count })), totalValue: value._sum.purchasePrice || 0, maintenanceCost: maintenanceCost._sum.cost || 0, byCategory: byCategory.map((x) => ({ name: x.name, count: x._count.assets })), byLocation: byLocation.map((x) => ({ name: x.name, count: x._count.assets })) };
+    return { total, byStatus: grouped.map((x) => ({ status: x.status, count: x._count })), totalValue: value._sum.purchasePrice || 0, maintenanceCost: maintenanceCost._sum.cost || 0, activeMaintenance, departmentCount, byCategory: byCategory.map((x) => ({ name: x.name, count: x._count.assets })), byLocation: byLocation.map((x) => ({ name: x.name, count: x._count.assets })), attention, recentMovements };
   }
   async assetExcel(response: Response) {
     const assets = await this.db.asset.findMany({ where: { deletedAt: null }, include: { category: true, location: true, department: true } });
