@@ -20,7 +20,14 @@ export class MasterService {
   constructor(private db: PrismaService) {}
   private model(type: MasterType): any {
     if (!allowed.has(type)) throw new Error('Master data tidak dikenal');
-    return (this.db as any)[type.slice(0, -1)];
+    const models: Record<MasterType, string> = {
+      categories: 'category',
+      locations: 'location',
+      departments: 'department',
+      vendors: 'vendor',
+      suppliers: 'supplier',
+    };
+    return (this.db as any)[models[type]];
   }
   list(type: MasterType) { return this.model(type).findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } }); }
   create(type: MasterType, data: MasterDto) { return this.model(type).create({ data }); }

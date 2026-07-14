@@ -49,13 +49,62 @@ export class AuthService {
     let active = null;
     for (const session of sessions) if (await argon2.verify(session.refreshTokenHash, refresh)) { active = session; break; }
     if (!active) throw new UnauthorizedException('Sesi tidak ditemukan');
-    const nextPayload = { sub: payload.sub, role: payload.role, permissions: payload.permissions };
+    const user = await this.db.user.findFirst({
+      where: { id: payload.sub, active: true, deletedAt: null },
+      include: { role: { include: { permissions: { include: { permission: true } } } } },
+    });
+    if (!user) throw new UnauthorizedException('Akun tidak lagi aktif');
+    const nextPayload = {
+      sub: user.id,
+      role: user.role.name,
+      permissions: user.role.permissions.map((item) => item.permission.code),
+    };
     const access = await this.jwt.signAsync(nextPayload, { secret: this.config.getOrThrow('JWT_ACCESS_SECRET'), expiresIn: '15m' });
     const nextRefresh = await this.jwt.signAsync(nextPayload, { secret: this.config.getOrThrow('JWT_REFRESH_SECRET'), expiresIn: '7d' });
     await this.db.$transaction([this.db.loginSession.update({ where: { id: active.id }, data: { revokedAt: new Date() } }), this.db.loginSession.create({ data: { userId: payload.sub, refreshTokenHash: await argon2.hash(nextRefresh), expiresAt: new Date(Date.now() + 604_800_000) } })]);
     const secure = this.config.get('NODE_ENV') === 'production';
     response.cookie('assetra_access', access, { httpOnly: true, sameSite: 'lax', secure, maxAge: 900_000 });
     response.cookie('assetra_refresh', nextRefresh, { httpOnly: true, sameSite: 'lax', secure, maxAge: 604_800_000 });
+    return { success: true };
+  }
+
+  async profile(userId: string) {
+    const user = await this.db.user.findFirstOrThrow({
+      where: { id: userId, active: true, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        active: true,
+        role: { select: { name: true, permissions: { select: { permission: { select: { code: true } } } } } },
+        department: { select: { id: true, name: true } },
+      },
+    });
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      active: user.active,
+      role: user.role.name,
+      permissions: user.role.permissions.map((item) => item.permission.code),
+      department: user.department,
+    };
+  }
+
+  async logout(request: Request, response: Response) {
+    const refresh = request.cookies?.assetra_refresh;
+    if (refresh) {
+      const sessions = await this.db.loginSession.findMany({ where: { revokedAt: null, expiresAt: { gt: new Date() } } });
+      for (const session of sessions) {
+        if (await argon2.verify(session.refreshTokenHash, refresh)) {
+          await this.db.loginSession.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+          break;
+        }
+      }
+    }
+    response.clearCookie('assetra_access');
+    response.clearCookie('assetra_refresh');
+    response.clearCookie('assetra_csrf');
     return { success: true };
   }
 }
@@ -106,8 +155,6 @@ export class AuthController {
   constructor(private auth: AuthService) {}
   @Public() @Post('login') login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: Response) { return this.auth.login(dto, response); }
   @Public() @Post('refresh') refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) { return this.auth.refresh(request, response); }
-  @Post('logout') logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('assetra_access'); response.clearCookie('assetra_refresh'); response.clearCookie('assetra_csrf'); return { success: true };
-  }
-  @Get('me') me() { return { authenticated: true }; }
+  @Post('logout') logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) { return this.auth.logout(request, response); }
+  @Get('me') me(@Req() request: any) { return this.auth.profile(request.user.sub); }
 }
