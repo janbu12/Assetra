@@ -22,20 +22,6 @@ export class AssetDto {
   @IsOptional() @IsString() warrantyUntil?: string;
 }
 
-@ApiTags('assets')
-@Permissions('assets.read')
-@Controller('assets')
-export class AssetController {
-  constructor(private service: AssetService) {}
-  @Get() list(@Query('q') q?: string, @Query('status') status?: AssetStatus, @Query('page') page = '1') { return this.service.list(q, status, Number(page)); }
-  @Get('qr/:token') byQr(@Param('token') token: string) { return this.service.byQr(token); }
-  @Get(':id') detail(@Param('id') id: string) { return this.service.detail(id); }
-  @Get(':id/qr') qr(@Param('id') id: string) { return this.service.qr(id); }
-  @Permissions('assets.write') @Post() create(@Body() dto: AssetDto, @Req() req: any) { return this.service.create(dto, req.user.sub); }
-  @Permissions('assets.write') @Patch(':id') update(@Param('id') id: string, @Body() dto: Partial<AssetDto>, @Req() req: any) { return this.service.update(id, dto, req.user.sub); }
-  @Permissions('assets.write') @Delete(':id') remove(@Param('id') id: string) { return this.service.remove(id); }
-}
-
 @Injectable()
 export class AssetService {
   constructor(private db: PrismaService) {}
@@ -64,4 +50,18 @@ export class AssetService {
     return updated;
   }
   remove(id: string) { return this.db.asset.update({ where: { id }, data: { deletedAt: new Date() } }); }
+}
+
+@ApiTags('assets')
+@Permissions('assets.read')
+@Controller('assets')
+export class AssetController {
+  constructor(private service: AssetService) {}
+  @Get() list(@Query('q') q?: string, @Query('status') status?: AssetStatus, @Query('page') page = '1') { return this.service.list(q, status, Number(page)); }
+  @Get('qr/:token') byQr(@Param('token') token: string) { return this.service.byQr(token); }
+  @Get(':id') detail(@Param('id') id: string) { return this.service.detail(id); }
+  @Get(':id/qr') qr(@Param('id') id: string) { return this.service.qr(id); }
+  @Permissions('assets.write') @Post() create(@Body() dto: AssetDto, @Req() req: any) { return this.service.create(dto, req.user.sub); }
+  @Permissions('assets.write') @Patch(':id') update(@Param('id') id: string, @Body() dto: Partial<AssetDto>, @Req() req: any) { return this.service.update(id, dto, req.user.sub); }
+  @Permissions('assets.write') @Delete(':id') remove(@Param('id') id: string) { return this.service.remove(id); }
 }

@@ -6,10 +6,10 @@ Assetra adalah PWA manajemen aset perusahaan untuk inventaris, QR Code, peminjam
 
 1. Sesuaikan nilai pada `.env`, terutama seluruh secret dan password untuk produksi.
 2. Jalankan `docker compose up --build`.
-3. Buka `http://localhost` dan masuk dengan akun seed `admin@assetra.id` / `Assetra123!`.
-4. Dokumentasi API tersedia di `http://localhost/docs`.
+3. Buka `http://localhost:8088` dan masuk dengan akun seed `admin@assetra.id` / `Assetra123!`.
+4. Dokumentasi API tersedia di `http://localhost:8088/docs`.
 
-PostgreSQL, Redis, MinIO, API, worker, web, dan Nginx akan dijalankan bersama. MinIO Console tersedia di `http://localhost:9001`.
+PostgreSQL, Redis, MinIO, API, worker, web, dan Nginx akan dijalankan bersama. MinIO Console tersedia di `http://localhost:9002`. Port host dapat diubah melalui `ASSETRA_HTTP_PORT` dan `MINIO_CONSOLE_PORT` pada `.env`.
 
 ## Pengembangan lokal
 
