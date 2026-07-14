@@ -1,0 +1,7 @@
+{
+  "name": "@assetra/worker",
+  "private": true,
+  "scripts": { "dev": "tsx watch src/index.ts", "build": "tsc", "start": "node dist/index.js", "test": "echo worker-ready", "lint": "tsc --noEmit" },
+  "dependencies": { "bullmq": "^5.56.0", "nodemailer": "^7.0.3" },
+  "devDependencies": { "@types/node": "^24.0.0", "@types/nodemailer": "^6.4.17", "tsx": "^4.20.3", "typescript": "^5.8.3" }
+}
