@@ -39,6 +39,23 @@ export class DashboardService {
     const doc = new PDFDocument({ margin: 48 }); doc.pipe(response); doc.fontSize(22).text('Laporan Audit Assetra'); doc.moveDown().fontSize(14).text(audit.name); doc.fontSize(10).fillColor('#64748b').text(`Status: ${audit.status} | Dibuat: ${audit.createdAt.toLocaleDateString('id-ID')}`); doc.moveDown();
     audit.results.forEach((row) => doc.fillColor('#111827').fontSize(10).text(`${row.asset.code} - ${row.asset.name} | ${row.status}${row.note ? ` | ${row.note}` : ''}`)); doc.end();
   }
+  async auditExcel(id: string, response: Response) {
+    const audit = await this.db.auditSession.findUniqueOrThrow({ where: { id }, include: { results: { include: { asset: { include: { location: true, category: true } } } } } });
+    const book = new ExcelJS.Workbook(); const sheet = book.addWorksheet('Hasil audit');
+    sheet.columns = [{header:'Kode',key:'code',width:18},{header:'Nama aset',key:'name',width:30},{header:'Kategori',key:'category',width:20},{header:'Lokasi terdaftar',key:'registered',width:24},{header:'Lokasi ditemukan',key:'observed',width:24},{header:'Kondisi',key:'condition',width:20},{header:'Hasil',key:'status',width:20},{header:'Catatan',key:'note',width:30}];
+    audit.results.forEach((row)=>sheet.addRow({code:row.asset.code,name:row.asset.name,category:row.asset.category.name,registered:row.asset.location.name,observed:row.observedLocation,condition:row.observedCondition||row.asset.condition,status:row.status,note:row.note}));
+    sheet.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};sheet.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF12352F'}};
+    response.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');response.setHeader('Content-Disposition',`attachment; filename=audit-${id}.xlsx`);await book.xlsx.write(response);response.end();
+  }
+  async maintenanceExcel(response: Response) {
+    const rows=await this.db.maintenanceLog.findMany({include:{asset:{include:{location:true,category:true}}},orderBy:{createdAt:'desc'}});const book=new ExcelJS.Workbook();const sheet=book.addWorksheet('Maintenance');
+    sheet.columns=[{header:'Kode',key:'code',width:18},{header:'Aset',key:'asset',width:30},{header:'Kategori',key:'category',width:20},{header:'Lokasi',key:'location',width:22},{header:'Keluhan',key:'complaint',width:34},{header:'Tindakan',key:'action',width:34},{header:'Teknisi',key:'technician',width:22},{header:'Biaya',key:'cost',width:18},{header:'Status',key:'status',width:18},{header:'Mulai',key:'started',width:20},{header:'Selesai',key:'completed',width:20}];
+    rows.forEach(row=>sheet.addRow({code:row.asset.code,asset:row.asset.name,category:row.asset.category.name,location:row.asset.location.name,complaint:row.complaint,action:row.action,technician:row.technician,cost:Number(row.cost),status:row.status,started:row.startedAt,completed:row.completedAt}));sheet.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};sheet.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF12352F'}};
+    response.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');response.setHeader('Content-Disposition','attachment; filename=maintenance.xlsx');await book.xlsx.write(response);response.end();
+  }
+  async maintenancePdf(response: Response) {
+    const rows=await this.db.maintenanceLog.findMany({include:{asset:true},orderBy:{createdAt:'desc'}});response.setHeader('Content-Type','application/pdf');response.setHeader('Content-Disposition','attachment; filename=maintenance.pdf');const doc=new PDFDocument({margin:48});doc.pipe(response);doc.fontSize(22).text('Laporan Maintenance Assetra');doc.moveDown();rows.forEach(row=>doc.fontSize(10).fillColor('#111827').text(`${row.asset.code} - ${row.asset.name} | ${row.status} | ${Number(row.cost).toLocaleString('id-ID',{style:'currency',currency:'IDR'})}`).fillColor('#64748b').text(`${row.complaint}${row.action?` | Tindakan: ${row.action}`:''}`).moveDown(.5));doc.end();
+  }
 }
 
 @ApiTags('dashboard-reports')
@@ -48,5 +65,8 @@ export class DashboardController {
   @Permissions('dashboard.read') @Get('dashboard') summary() { return this.service.summary(); }
   @Permissions('reports.read') @Get('reports/assets.xlsx') excel(@Res() response: Response) { return this.service.assetExcel(response); }
   @Permissions('reports.read') @Get('reports/audits/:id.pdf') pdf(@Param('id') id: string, @Res() response: Response) { return this.service.auditPdf(id, response); }
+  @Permissions('reports.read') @Get('reports/audits/:id.xlsx') auditExcel(@Param('id') id: string, @Res() response: Response) { return this.service.auditExcel(id, response); }
+  @Permissions('reports.read') @Get('reports/maintenance.xlsx') maintenanceExcel(@Res() response: Response) { return this.service.maintenanceExcel(response); }
+  @Permissions('reports.read') @Get('reports/maintenance.pdf') maintenancePdf(@Res() response: Response) { return this.service.maintenancePdf(response); }
   @Public() @Get('health') health() { return { status: 'ok', service: 'assetra-api', timestamp: new Date().toISOString() }; }
 }
