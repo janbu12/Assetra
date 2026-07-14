@@ -1,0 +1,17 @@
+'use client';
+import { AppShell } from '@/components/app-shell';
+import { Download, Filter, MoreHorizontal, Plus, QrCode, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
+import { api } from '@/lib/api';
+
+const assets=[
+  {name:'MacBook Pro 14',code:'AST-2026-001',serial:'MBP-DEMO-001',category:'Laptop',location:'Kantor Pusat',department:'Teknologi Informasi',status:'Tersedia',condition:'Baik'},
+  {name:'ThinkPad X1 Carbon',code:'AST-2026-002',serial:'TP-DEMO-002',category:'Laptop',location:'Kantor Pusat',department:'Operasional',status:'Dipakai',condition:'Baik'},
+  {name:'Printer LaserJet Pro',code:'AST-2026-003',serial:'PR-DEMO-003',category:'Printer',location:'Gudang Utama',department:'Operasional',status:'Maintenance',condition:'Perlu perbaikan'},
+  {name:'Monitor Dell UltraSharp',code:'AST-2026-004',serial:'DL-DEMO-004',category:'Monitor',location:'Kantor Pusat',department:'Keuangan',status:'Tersedia',condition:'Baik'},
+];
+type Row = typeof assets[number];
+const statusLabel:Record<string,string>={AVAILABLE:'Tersedia',IN_USE:'Dipakai',MAINTENANCE:'Maintenance',LOST:'Hilang',DISPOSED:'Dihapuskan'};
+const conditionLabel:Record<string,string>={GOOD:'Baik',DAMAGED:'Rusak',NEEDS_REPAIR:'Perlu perbaikan',UNKNOWN:'Belum dinilai'};
+export default function Assets(){const [q,setQ]=useState('');const [data,setData]=useState<Row[]>(assets);useEffect(()=>{api<{items:any[]}>('/assets').then(result=>setData(result.items.map(a=>({name:a.name,code:a.code,serial:a.serialNumber||'-',category:a.category.name,location:a.location.name,department:a.department?.name||'-',status:statusLabel[a.status]||a.status,condition:conditionLabel[a.condition]||a.condition})))).catch(()=>undefined);},[]);const rows=useMemo(()=>data.filter(a=>`${a.name} ${a.code} ${a.serial}`.toLowerCase().includes(q.toLowerCase())),[q,data]);return <AppShell><div className="content"><div className="heading-row"><div><div className="eyebrow">Inventaris</div><h1 className="page-title">Daftar aset</h1><p className="subtitle">Kelola {data.length.toLocaleString('id-ID')} aset terdaftar di seluruh lokasi.</p></div><button className="button"><Plus size={16}/><span>Tambah aset</span></button></div><div className="table-card"><div className="table-tools"><div style={{display:'flex',gap:9}}><div className="search" style={{width:300}}><Search size={14}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari kode, nama, atau serial..."/></div><button className="button secondary"><Filter size={14}/>Filter</button></div><div style={{display:'flex',gap:8}}><button className="button secondary"><QrCode size={14}/>QR bulk</button><a className="button secondary" href="/api/v1/reports/assets.xlsx"><Download size={14}/>Excel</a></div></div><table><thead><tr><th>Aset</th><th>Kategori</th><th>Lokasi</th><th>Departemen</th><th>Kondisi</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(a=><tr key={a.code}><td><span className="asset-name">{a.name}</span><span className="asset-code">{a.code} • {a.serial}</span></td><td>{a.category}</td><td>{a.location}</td><td>{a.department}</td><td>{a.condition}</td><td><span className={`badge ${a.status==='Maintenance'?'warning':''}`}>{a.status}</span></td><td><button className="icon-button" style={{width:30,height:30}}><MoreHorizontal size={14}/></button></td></tr>)}</tbody></table></div></div></AppShell>}

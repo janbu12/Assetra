@@ -1,0 +1,1 @@
+export default function Offline(){return <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><div className="card empty-illustration" style={{maxWidth:420}}><h1 className="page-title">Anda sedang offline</h1><p className="subtitle">Assetra akan tetap menyimpan scan audit di perangkat dan menyinkronkannya saat koneksi kembali.</p></div></main>}
