@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  LOST
+  DISPOSED
+}
+enum AssetCondition {
+  GOOD
+  DAMAGED
+  NEEDS_REPAIR
+  UNKNOWN
+}
+enum LoanStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+}
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+enum AuditStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}
+enum AuditResultStatus {
+  FOUND
+  NOT_FOUND
+  DAMAGED
+  LOCATION_MISMATCH
+}
+enum NotificationType {
+  WARRANTY
+  MAINTENANCE
+  AUDIT
+  SYSTEM
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  email          String          @unique
+  name           String
+  passwordHash   String
+  active         Boolean         @default(true)
+  roleId         String          @db.Uuid
+  role           Role            @relation(fields: [roleId], references: [id])
+  departmentId   String?         @db.Uuid
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  assignedAssets Asset[]         @relation("AssetCustodian")
+  notifications  Notification[]
+  sessions       LoginSession[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+}
+
+model Department {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  code      String   @unique
+  users     User[]
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model Location {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  code      String   @unique
+  address   String?
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  code      String   @unique
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model Vendor {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  email     String?
+  phone     String?
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  email     String?
+  phone     String?
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model Asset {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique
+  name           String
+  serialNumber   String?         @unique
+  qrToken        String          @unique @default(uuid())
+  description    String?
+  status         AssetStatus     @default(AVAILABLE)
+  condition      AssetCondition  @default(GOOD)
+  purchaseDate   DateTime?
+  purchasePrice  Decimal?        @db.Decimal(18, 2)
+  warrantyUntil  DateTime?
+  categoryId     String          @db.Uuid
+  category       Category        @relation(fields: [categoryId], references: [id])
+  locationId     String          @db.Uuid
+  location       Location        @relation(fields: [locationId], references: [id])
+  departmentId   String?         @db.Uuid
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  vendorId       String?         @db.Uuid
+  vendor         Vendor?         @relation(fields: [vendorId], references: [id])
+  supplierId     String?         @db.Uuid
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  custodianId    String?         @db.Uuid
+  custodian      User?           @relation("AssetCustodian", fields: [custodianId], references: [id])
+  photos         AssetPhoto[]
+  movements      AssetMovement[]
+  loans          AssetLoan[]
+  maintenance    MaintenanceLog[]
+  auditResults   AuditResult[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  @@index([status, categoryId, locationId])
+}
+
+model AssetPhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  assetId   String   @db.Uuid
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  objectKey String
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model AssetMovement {
+  id             String      @id @default(uuid()) @db.Uuid
+  assetId        String      @db.Uuid
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  actorId        String      @db.Uuid
+  fromLocationId String?     @db.Uuid
+  toLocationId   String?     @db.Uuid
+  fromStatus     AssetStatus?
+  toStatus       AssetStatus?
+  fromCustodian  String?
+  toCustodian    String?
+  reason         String?
+  createdAt      DateTime    @default(now())
+  @@index([assetId, createdAt])
+}
+
+model AssetLoan {
+  id           String     @id @default(uuid()) @db.Uuid
+  assetId      String     @db.Uuid
+  asset        Asset      @relation(fields: [assetId], references: [id])
+  borrowerName String
+  departmentId String?    @db.Uuid
+  loanedAt     DateTime   @default(now())
+  dueAt        DateTime?
+  returnedAt   DateTime?
+  status       LoanStatus @default(ACTIVE)
+  notes        String?
+  createdById  String     @db.Uuid
+  @@index([assetId, status])
+}
+
+model MaintenanceLog {
+  id          String            @id @default(uuid()) @db.Uuid
+  assetId     String            @db.Uuid
+  asset       Asset             @relation(fields: [assetId], references: [id])
+  complaint   String
+  action      String?
+  technician  String?
+  cost        Decimal           @default(0) @db.Decimal(18, 2)
+  status      MaintenanceStatus @default(OPEN)
+  startedAt   DateTime          @default(now())
+  completedAt DateTime?
+  createdById String            @db.Uuid
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model AuditSession {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  status       AuditStatus   @default(DRAFT)
+  locationId   String?       @db.Uuid
+  departmentId String?       @db.Uuid
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdById  String        @db.Uuid
+  results      AuditResult[]
+  events       AuditEvent[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model AuditResult {
+  id               String            @id @default(uuid()) @db.Uuid
+  sessionId        String            @db.Uuid
+  session          AuditSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assetId          String            @db.Uuid
+  asset            Asset             @relation(fields: [assetId], references: [id])
+  status           AuditResultStatus @default(NOT_FOUND)
+  observedLocation String?
+  observedCondition AssetCondition?
+  note             String?
+  scannedAt        DateTime?
+  scannedById      String?           @db.Uuid
+  @@unique([sessionId, assetId])
+}
+
+model AuditEvent {
+  id              String       @id @default(uuid()) @db.Uuid
+  operationId     String       @unique
+  sessionId       String       @db.Uuid
+  session         AuditSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assetId         String?      @db.Uuid
+  scannedById     String       @db.Uuid
+  payload         Json
+  clientScannedAt DateTime
+  createdAt       DateTime     @default(now())
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+}
+
+model LoginSession {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+}
+
+model SystemAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  @@index([entityType, entityId, createdAt])
+}
