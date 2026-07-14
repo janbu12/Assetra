@@ -18,7 +18,8 @@ async function refreshSession() {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const request = () => {
     const csrf = csrfToken();
-    return fetch(`${API_URL}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...(csrf ? { 'x-csrf-token': csrf } : {}), ...init?.headers } });
+    const isForm = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+    return fetch(`${API_URL}${path}`, { ...init, credentials: 'include', headers: { ...(!isForm ? { 'Content-Type': 'application/json' } : {}), ...(csrf ? { 'x-csrf-token': csrf } : {}), ...init?.headers } });
   };
   let response = await request();
   if (response.status === 401 && !path.startsWith('/auth/')) {
