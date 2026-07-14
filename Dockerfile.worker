@@ -1,0 +1,9 @@
+FROM node:22-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY apps/worker/package.json apps/worker/package.json
+RUN pnpm install --frozen-lockfile --filter @assetra/worker...
+COPY apps/worker apps/worker
+RUN pnpm --filter @assetra/worker build
+CMD ["node", "apps/worker/dist/index.js"]
